@@ -12,7 +12,7 @@ const PRICE = process.env.X402_PRICE ?? "$0.01";
 const CACHE_TTL_MS = 5 * 60 * 1_000;
 const cache = new Map();
 const PUBLIC_SOURCE = "https://github.com/ArgonautWorks/bounty-signal-api";
-const SERVICE_VERSION = "0.1.1";
+const SERVICE_VERSION = "0.1.2";
 const SERVICE_DESCRIPTION = "Canonical GitHub bounty viability checks for agents: live issue state, repository trust, payout evidence, age, claims, assignments, and competing pull requests.";
 const DISCOVERY_GUIDANCE = [
   "Use this API before committing implementation time to a public GitHub issue advertised as a paid bounty.",
@@ -28,6 +28,7 @@ if (!/^0x[a-fA-F0-9]{40}$/.test(PAY_TO)) {
 const app = express();
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
+app.use(express.json({ limit: "8kb" }));
 
 const facilitatorClient = new HTTPFacilitatorClient({ url: FACILITATOR_URL });
 const resourceServer = new x402ResourceServer(facilitatorClient)
@@ -55,8 +56,30 @@ const discovery = declareDiscoveryExtension({
   },
 });
 
-app.use(paymentMiddleware({
-  "GET /api/v1/check": {
+const postDiscovery = declareDiscoveryExtension({
+  input: { url: "https://github.com/electron/electron/issues/48191" },
+  inputSchema: {
+    properties: {
+      url: {
+        type: "string",
+        format: "uri",
+        description: "Canonical public GitHub issue URL to assess as a paid bounty.",
+      },
+    },
+    required: ["url"],
+  },
+  bodyType: "json",
+  output: {
+    example: {
+      verdict: "reject",
+      score: 0,
+      reasons: ["canonical_issue_closed", "existing_competition"],
+      evidence: { canonical_issue_state: "closed", competing_pull_requests: 12 },
+    },
+  },
+});
+
+const paidCheckResource = {
     accepts: [{
       scheme: "exact",
       price: PRICE,
@@ -68,14 +91,19 @@ app.use(paymentMiddleware({
     serviceName: "ArgonautWorks Bounty Signal",
     tags: ["github", "bounties", "agent-tools", "due-diligence"],
     extensions: discovery,
-  },
+};
+const paidCheckPostResource = { ...paidCheckResource, extensions: postDiscovery };
+
+app.use(paymentMiddleware({
+  "GET /api/v1/check": paidCheckResource,
+  "POST /api/v1/check": paidCheckPostResource,
 }, resourceServer));
 
 app.get("/", (_request, response) => {
   response.json({
     service: "ArgonautWorks Bounty Signal API",
     purpose: "Reject stale, fake, crowded, or unfunded GitHub bounties before an agent spends implementation time.",
-    endpoint: "GET /api/v1/check?url=https://github.com/{owner}/{repo}/issues/{number}",
+    endpoint: "GET with a url query parameter or POST {\"url\":\"https://github.com/{owner}/{repo}/issues/{number}\"} to /api/v1/check",
     price: PRICE,
     settlement: { protocol: "x402", network: NETWORK, asset: "USDC" },
     health: "/health",
@@ -138,6 +166,40 @@ app.get("/openapi.json", (request, response) => {
             502: { description: "Upstream GitHub lookup failed" },
           },
         },
+        post: {
+          operationId: "checkGitHubBountyFromJson",
+          summary: "Check whether a public GitHub bounty is worth pursuing",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["url"],
+                  additionalProperties: false,
+                  properties: {
+                    url: {
+                      type: "string",
+                      format: "uri",
+                      description: "Canonical public GitHub issue URL to assess as a paid bounty.",
+                    },
+                  },
+                },
+                example: { url: "https://github.com/electron/electron/issues/48191" },
+              },
+            },
+          },
+          "x-payment-info": {
+            price: { mode: "fixed", currency: "USD", amount: "0.01" },
+            protocols: [{ x402: {} }],
+          },
+          responses: {
+            200: { description: "Evidence-backed viability decision" },
+            400: { description: "Invalid GitHub issue URL" },
+            402: { description: "x402 Base-USDC payment challenge" },
+            502: { description: "Upstream GitHub lookup failed" },
+          },
+        },
       },
     },
   });
@@ -159,14 +221,24 @@ app.get("/.well-known/x402", (request, response) => {
     serviceName: "ArgonautWorks Bounty Signal",
     description: SERVICE_DESCRIPTION,
     source: PUBLIC_SOURCE,
-    resources: [{
-      resource: `${origin}/api/v1/check`,
-      method: "GET",
-      price: PRICE,
-      network: NETWORK,
-      asset: "USDC",
-      input: { queryParams: { url: "https://github.com/{owner}/{repo}/issues/{number}" } },
-    }],
+    resources: [
+      {
+        resource: `${origin}/api/v1/check`,
+        method: "GET",
+        price: PRICE,
+        network: NETWORK,
+        asset: "USDC",
+        input: { queryParams: { url: "https://github.com/{owner}/{repo}/issues/{number}" } },
+      },
+      {
+        resource: `${origin}/api/v1/check`,
+        method: "POST",
+        price: PRICE,
+        network: NETWORK,
+        asset: "USDC",
+        input: { body: { url: "https://github.com/{owner}/{repo}/issues/{number}" } },
+      },
+    ],
   });
 });
 
@@ -177,6 +249,7 @@ app.get("/llms.txt", (_request, response) => {
     SERVICE_DESCRIPTION,
     "",
     "Paid endpoint: GET /api/v1/check?url=https://github.com/{owner}/{repo}/issues/{number}",
+    "Marketplace-compatible endpoint: POST /api/v1/check with JSON {\"url\":\"https://github.com/{owner}/{repo}/issues/{number}\"}",
     `Price: ${PRICE} USDC on Base via x402 v2`,
     "OpenAPI: /openapi.json",
     "x402 manifest: /.well-known/x402",
@@ -196,9 +269,9 @@ app.get("/health", (_request, response) => {
   });
 });
 
-app.get("/api/v1/check", async (request, response) => {
+app.all("/api/v1/check", async (request, response) => {
   try {
-    const target = parseGitHubIssueUrl(request.query.url);
+    const target = parseGitHubIssueUrl(request.method === "POST" ? request.body?.url : request.query.url);
     const cached = cache.get(target.canonicalUrl);
     if (cached && Date.now() - cached.createdAt < CACHE_TTL_MS) {
       response.set("x-argonaut-cache", "hit").json(cached.value);
