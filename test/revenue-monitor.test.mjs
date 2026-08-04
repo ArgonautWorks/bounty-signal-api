@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  ATELIER_REPORT_PAYOUT_ATOMIC,
+  ATELIER_TREASURY,
+  ATELIER_X402_REPORT_PAYOUT_ATOMIC,
   BASE_USDC,
   DIRECT_REPORT_PRICE_ATOMIC,
+  TRANSFER_SELECTOR,
   TRANSFER_TOPIC,
   classifyBountySignalTransfer,
   ledgerDate,
@@ -62,6 +66,40 @@ test("classifies the distinct direct-report price without colliding with PayanAg
     block_number: 49528401,
   });
   assert.match(revenueLedgerRow(report, new Date("2026-08-04T22:30:00.000Z")), /^2026-08-05,E022,download_revenue,0\.00,1\.99,1\.99,/);
+});
+
+test("classifies only the exact Atelier treasury payout for the marketplace report", () => {
+  const receipt = classifyBountySignalTransfer(
+    paidLog({
+      topics: [TRANSFER_TOPIC, addressTopic(ATELIER_TREASURY), addressTopic(WALLET)],
+      data: `0x${ATELIER_REPORT_PAYOUT_ATOMIC.toString(16)}`,
+      transactionHash: "0xatelier",
+    }),
+    { to: BASE_USDC, input: `${TRANSFER_SELECTOR}00` },
+    WALLET,
+  );
+  assert.deepEqual(receipt, {
+    experiment_id: "E038",
+    kind: "marketplace_revenue",
+    revenue_usd: 0.45,
+    product: "atelier_bounty_report",
+    transaction: "0xatelier",
+    payer: ATELIER_TREASURY,
+    amount_usdc_atomic: "450000",
+    block_number: 49528401,
+  });
+  assert.match(revenueLedgerRow(receipt, new Date("2026-08-04T22:30:00.000Z")), /^2026-08-05,E038,marketplace_revenue,0\.00,0\.45,0\.45,/);
+
+  const x402Receipt = classifyBountySignalTransfer(
+    paidLog({
+      topics: [TRANSFER_TOPIC, addressTopic(ATELIER_TREASURY), addressTopic(WALLET)],
+      data: `0x${ATELIER_X402_REPORT_PAYOUT_ATOMIC.toString(16)}`,
+      transactionHash: "0xatelierx402",
+    }),
+    { to: BASE_USDC, input: `${TRANSFER_SELECTOR}00` },
+    WALLET,
+  );
+  assert.equal(x402Receipt.revenue_usd, 0.5);
 });
 
 test("rejects self-seeds, other amounts, and ordinary transfers", () => {

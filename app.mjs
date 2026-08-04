@@ -6,6 +6,11 @@ import { paymentMiddleware, x402ResourceServer } from "@x402/express";
 import { declareDiscoveryExtension } from "@x402/extensions/bazaar";
 import { evaluateGitHubBounty, parseGitHubIssueUrl } from "./lib/evaluate-github-bounty.mjs";
 import {
+  AtelierReportAccessError,
+  authorizeAtelierReport,
+  renderAtelierReport,
+} from "./lib/atelier-report.mjs";
+import {
   DIRECT_REPORT_PRICE,
   REPORT_EDITION,
   loadReportContent,
@@ -18,7 +23,7 @@ const PRICE = process.env.X402_PRICE ?? "$0.01";
 const CACHE_TTL_MS = 5 * 60 * 1_000;
 const cache = new Map();
 const PUBLIC_SOURCE = "https://github.com/ArgonautWorks/bounty-signal-api";
-const SERVICE_VERSION = "0.3.0";
+const SERVICE_VERSION = "0.4.0";
 const SERVICE_DESCRIPTION = "Canonical GitHub bounty viability checks for agents: live issue state, repository trust, payout evidence, age, claims, assignments, and competing pull requests.";
 const DISCOVERY_GUIDANCE = [
   "Use this API before committing implementation time to a public GitHub issue advertised as a paid bounty.",
@@ -536,6 +541,29 @@ app.all("/api/v1/report", (_request, response) => {
     .set("content-disposition", `attachment; filename=\"agent-bounty-reality-check-${REPORT_EDITION}.md\"`)
     .set("x-argonaut-report-edition", REPORT_EDITION)
     .send(REPORT_CONTENT);
+});
+
+app.get("/api/v1/atelier-report", async (request, response) => {
+  try {
+    const access = await authorizeAtelierReport(request.query, PAY_TO);
+    const cached = cache.get(access.target.canonicalUrl);
+    const cacheHit = cached && Date.now() - cached.createdAt < CACHE_TTL_MS;
+    const result = cacheHit ? cached.value : await evaluateGitHubBounty(access.target.canonicalUrl);
+    if (!cacheHit) cache.set(access.target.canonicalUrl, { createdAt: Date.now(), value: result });
+    response
+      .type("text/html")
+      .set("cache-control", "private, max-age=300")
+      .set("x-robots-tag", "noindex, nofollow")
+      .send(renderAtelierReport(result, access.orderId));
+  } catch (error) {
+    if (error instanceof AtelierReportAccessError) {
+      response.status(error.status).json({ error: error.message });
+      return;
+    }
+    const message = error instanceof Error ? error.message : "Unable to evaluate bounty";
+    const status = /must (?:be|use|match)|valid GitHub issue URL/.test(message) ? 400 : 502;
+    response.status(status).json({ error: message });
+  }
 });
 
 app.all("/api/v1/check", async (request, response) => {

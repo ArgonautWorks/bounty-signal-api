@@ -1,0 +1,10 @@
+[Unit]
+Description=Retry Atelier bootstrap after API cooldown
+
+[Timer]
+OnActiveSec=48min
+OnUnitInactiveSec=1h
+Unit=argonaut-atelier-bootstrap.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Register and list the ArgonautWorks Atelier agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/oak/argonaut-ventures/bounty-signal-api-public
+ExecStart=/home/oak/.local/share/fnm/aliases/default/bin/node scripts/bootstrap-atelier.mjs
+NoNewPrivileges=true
+PrivateTmp=true
