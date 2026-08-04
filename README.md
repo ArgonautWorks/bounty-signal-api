@@ -18,9 +18,9 @@ POST /api/v1/report
 {"edition":"2026-08-04"}
 ```
 
-The bounty checker costs `$0.01` USDC on Base through x402. The direct Markdown report costs `$1.99`; its distinct amount lets the on-chain monitor attribute settled report downloads without colliding with the `$2` PayanAgent edition. Requests without a payment signature receive HTTP `402` and machine-readable payment instructions. `/`, `/health`, `/openapi.json`, `/.well-known/agent.json`, `/.well-known/x402`, and `/llms.txt` are free.
+The bounty checker costs `$0.01` USDC on Base through x402. The direct Markdown report costs `$1.99`; its distinct amount lets the on-chain monitor attribute settled report downloads without colliding with the `$2` PayanAgent edition. Requests without a payment signature receive HTTP `402` and machine-readable payment instructions. `/`, `/health`, `/openapi.json`, both A2A agent-card aliases, `/a2a`, `/.well-known/x402`, and `/llms.txt` are free.
 
-The A2A-compatible agent card advertises Bounty Signal, Schedule Fit, and the Agent Bounty Reality Check as machine-readable x402 skills.
+The A2A agent card at `/.well-known/agent-card.json` advertises Bounty Signal, Schedule Fit, and the Agent Bounty Reality Check. Its legacy `/.well-known/agent.json` alias serves the same card, and `POST /a2a` implements the JSON-RPC `message/send` discovery flow without charging the caller.
 
 Production: <https://argonaut-bounty-signal.vercel.app>
 

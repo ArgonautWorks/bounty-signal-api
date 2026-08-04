@@ -23,7 +23,7 @@ test("OpenAPI declares the paid route for autonomous discovery", async () => {
     const operation = document.paths["/api/v1/check"].get;
 
     assert.equal(document.openapi, "3.1.0");
-    assert.equal(document.info.version, "0.2.0");
+    assert.equal(document.info.version, "0.3.0");
     assert.equal(document.info.contact.url, "https://github.com/ArgonautWorks/bounty-signal-api");
     assert.match(document.info["x-guidance"], /before committing implementation time/);
     assert.deepEqual(operation["x-payment-info"], {
@@ -54,30 +54,72 @@ test("crawler identity asset and service version are public", async () => {
     assert.equal(favicon.status, 200);
     assert.match(favicon.headers.get("content-type"), /^image\/svg\+xml/);
     assert.match(await favicon.text(), /<svg/);
-    assert.equal(health.version, "0.2.0");
+    assert.equal(health.version, "0.3.0");
   });
 });
 
-test("A2A agent card exposes the live paid products", async () => {
+test("A2A agent card declares a JSON-RPC transport and the paid products", async () => {
   await withServer(async (origin) => {
-    const response = await fetch(`${origin}/.well-known/agent.json`);
-    assert.equal(response.status, 200);
-    const card = await response.json();
+    const [cardResponse, aliasResponse] = await Promise.all([
+      fetch(`${origin}/.well-known/agent-card.json`),
+      fetch(`${origin}/.well-known/agent.json`),
+    ]);
+    assert.equal(cardResponse.status, 200);
+    assert.equal(aliasResponse.status, 200);
+    const card = await cardResponse.json();
+    assert.deepEqual(await aliasResponse.json(), card);
 
-    assert.equal(card.name, "ArgonautWorks");
-    assert.equal(card.url, origin);
-    assert.equal(card.version, "0.2.0");
-    assert.deepEqual(card.capabilities, { streaming: false, pushNotifications: false });
-    assert.equal(card.documentation.openapi, `${origin}/openapi.json`);
+    assert.equal(card.name, "ArgonautWorks Bounty Signal");
+    assert.equal(card.protocolVersion, "0.3");
+    assert.equal(card.url, `${origin}/a2a`);
+    assert.equal(card.preferredTransport, "JSONRPC");
+    assert.deepEqual(card.additionalInterfaces, [{ url: `${origin}/a2a`, transport: "JSONRPC" }]);
+    assert.equal(card.version, "0.3.0");
+    assert.deepEqual(card.capabilities, {
+      streaming: false,
+      pushNotifications: false,
+      stateTransitionHistory: false,
+    });
+    assert.equal(card.documentationUrl, `${origin}/openapi.json`);
+    assert.deepEqual(card.defaultInputModes, ["text/plain", "application/json"]);
+    assert.deepEqual(card.defaultOutputModes, ["text/plain", "application/json"]);
     assert.deepEqual(card.skills.map(({ id }) => id), [
       "bounty-signal",
       "schedule-fit",
       "bounty-reality-check",
     ]);
-    assert.equal(card.skills[0].uri, `${origin}/api/v1/check`);
-    assert.equal(card.skills[2].uri, `${origin}/api/v1/report`);
-    assert.deepEqual(card.skills[0].security, ["x402"]);
-    assert.equal(card.securitySchemes.x402.type, "x402");
+    assert.ok(card.skills.every((skill) => skill.tags.includes("x402")));
+  });
+});
+
+test("A2A message/send returns a completed task with product discovery", async () => {
+  await withServer(async (origin) => {
+    const response = await fetch(`${origin}/a2a`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "a2a-version": "0.3" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "registry-probe",
+        method: "message/send",
+        params: {
+          message: {
+            kind: "message",
+            messageId: "probe-message",
+            role: "user",
+            parts: [{ kind: "text", text: "Hello, what can you do?" }],
+          },
+        },
+      }),
+    });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.jsonrpc, "2.0");
+    assert.equal(body.id, "registry-probe");
+    assert.equal(body.result.kind, "task");
+    assert.equal(body.result.status.state, "completed");
+    assert.equal(body.result.status.message.role, "agent");
+    assert.match(body.result.status.message.parts[0].text, /GitHub bounty viability/);
+    assert.match(body.result.status.message.parts[0].text, /\.well-known\/x402/);
   });
 });
 
