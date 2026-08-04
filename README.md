@@ -25,6 +25,8 @@ Install the buyer workflow in supported coding agents:
 npx skills add ArgonautWorks/bounty-signal-api --skill bounty-signal
 ```
 
+For a broader dated market screen, the [$2 Agent Bounty Reality Check](https://payanagent.com/x402/kh77jyatx8rsxpmcat6s3a3yf18btx0q) covers 1,291 records across twelve sources, five verified high-value false leads, marketplace delivery evidence, and a reusable triage policy.
+
 ## Local validation
 
 ```bash
