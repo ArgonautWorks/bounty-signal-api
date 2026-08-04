@@ -12,7 +12,14 @@ const PRICE = process.env.X402_PRICE ?? "$0.01";
 const CACHE_TTL_MS = 5 * 60 * 1_000;
 const cache = new Map();
 const PUBLIC_SOURCE = "https://github.com/ArgonautWorks/bounty-signal-api";
+const SERVICE_VERSION = "0.1.1";
 const SERVICE_DESCRIPTION = "Canonical GitHub bounty viability checks for agents: live issue state, repository trust, payout evidence, age, claims, assignments, and competing pull requests.";
+const DISCOVERY_GUIDANCE = [
+  "Use this API before committing implementation time to a public GitHub issue advertised as a paid bounty.",
+  "Pass the canonical public GitHub issue URL in the required url query parameter.",
+  "The paid JSON response returns a verdict, score, explicit reasons, and current evidence about issue state, repository trust, payout signals, assignments, claims, and competing pull requests.",
+  "Treat reject as a stop signal, caution as a prompt for further verification, and viable as one input to an independent execution decision.",
+].join(" ");
 
 if (!/^0x[a-fA-F0-9]{40}$/.test(PAY_TO)) {
   throw new Error("PAY_TO must be an EVM address");
@@ -84,9 +91,11 @@ app.get("/openapi.json", (request, response) => {
     openapi: "3.1.0",
     info: {
       title: "ArgonautWorks Bounty Signal API",
-      version: "0.1.0",
+      version: SERVICE_VERSION,
       description: SERVICE_DESCRIPTION,
       license: { name: "MIT", identifier: "MIT" },
+      contact: { name: "ArgonautWorks", url: PUBLIC_SOURCE },
+      "x-guidance": DISCOVERY_GUIDANCE,
     },
     servers: [{ url: origin }],
     paths: {
@@ -98,11 +107,32 @@ app.get("/openapi.json", (request, response) => {
             name: "url",
             in: "query",
             required: true,
+            description: "Canonical public GitHub issue URL to assess as a paid bounty.",
             schema: { type: "string", format: "uri" },
             example: "https://github.com/electron/electron/issues/48191",
           }],
+          "x-payment-info": {
+            price: { mode: "fixed", currency: "USD", amount: "0.01" },
+            protocols: [{ x402: {} }],
+          },
           responses: {
-            200: { description: "Evidence-backed viability decision" },
+            200: {
+              description: "Evidence-backed viability decision",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    required: ["verdict", "score", "reasons", "evidence"],
+                    properties: {
+                      verdict: { type: "string", enum: ["viable", "caution", "reject"] },
+                      score: { type: "number" },
+                      reasons: { type: "array", items: { type: "string" } },
+                      evidence: { type: "object", additionalProperties: true },
+                    },
+                  },
+                },
+              },
+            },
             400: { description: "Invalid GitHub issue URL" },
             402: { description: "x402 Base-USDC payment challenge" },
             502: { description: "Upstream GitHub lookup failed" },
@@ -111,6 +141,15 @@ app.get("/openapi.json", (request, response) => {
       },
     },
   });
+});
+
+app.get(["/favicon.ico", "/favicon.svg"], (_request, response) => {
+  response.type("image/svg+xml").send([
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">',
+    '<rect width="64" height="64" rx="14" fill="#171717"/>',
+    '<path d="M14 46 28 14h8l14 32h-9l-3-8H25l-3 8h-8Zm14-16h7l-3.5-9L28 30Z" fill="#f5f5f5"/>',
+    "</svg>",
+  ].join(""));
 });
 
 app.get("/.well-known/x402", (request, response) => {
@@ -150,7 +189,7 @@ app.get("/health", (_request, response) => {
   response.json({
     ok: true,
     service: "bounty-signal-api",
-    version: "0.1.0",
+    version: SERVICE_VERSION,
     network: NETWORK,
     facilitator: new URL(FACILITATOR_URL).hostname,
     cache_entries: cache.size,
