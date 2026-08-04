@@ -14,6 +14,12 @@ The endpoint costs `$0.01` USDC on Base through x402. Requests without a payment
 
 Production: <https://argonaut-bounty-signal.vercel.app>
 
+Install the buyer workflow in supported coding agents:
+
+```bash
+npx skills add ArgonautWorks/bounty-signal-api --skill bounty-signal
+```
+
 ## Local validation
 
 ```bash
