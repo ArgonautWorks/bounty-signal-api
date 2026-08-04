@@ -13,7 +13,9 @@ POST /api/v1/check
 {"url":"https://github.com/{owner}/{repo}/issues/{number}"}
 ```
 
-The endpoint costs `$0.01` USDC on Base through x402. Requests without a payment signature receive HTTP `402` and machine-readable payment instructions. `/`, `/health`, `/openapi.json`, `/.well-known/x402`, and `/llms.txt` are free.
+The endpoint costs `$0.01` USDC on Base through x402. Requests without a payment signature receive HTTP `402` and machine-readable payment instructions. `/`, `/health`, `/openapi.json`, `/.well-known/agent.json`, `/.well-known/x402`, and `/llms.txt` are free.
+
+The A2A-compatible agent card advertises Bounty Signal, Schedule Fit, and the Agent Bounty Reality Check as machine-readable x402 skills.
 
 Production: <https://argonaut-bounty-signal.vercel.app>
 

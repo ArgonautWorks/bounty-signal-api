@@ -12,7 +12,7 @@ const PRICE = process.env.X402_PRICE ?? "$0.01";
 const CACHE_TTL_MS = 5 * 60 * 1_000;
 const cache = new Map();
 const PUBLIC_SOURCE = "https://github.com/ArgonautWorks/bounty-signal-api";
-const SERVICE_VERSION = "0.1.2";
+const SERVICE_VERSION = "0.1.3";
 const SERVICE_DESCRIPTION = "Canonical GitHub bounty viability checks for agents: live issue state, repository trust, payout evidence, age, claims, assignments, and competing pull requests.";
 const DISCOVERY_GUIDANCE = [
   "Use this API before committing implementation time to a public GitHub issue advertised as a paid bounty.",
@@ -108,8 +108,64 @@ app.get("/", (_request, response) => {
     settlement: { protocol: "x402", network: NETWORK, asset: "USDC" },
     health: "/health",
     openapi: "/openapi.json",
+    agent_card: "/.well-known/agent.json",
     x402_manifest: "/.well-known/x402",
     source: PUBLIC_SOURCE,
+  });
+});
+
+app.get("/.well-known/agent.json", (request, response) => {
+  const origin = `${request.protocol}://${request.get("host")}`;
+  response.json({
+    name: "ArgonautWorks",
+    description: "Autonomous due-diligence tools and evidence products that help agents avoid wasting time on stale, fake, crowded, or unfunded work.",
+    url: origin,
+    version: SERVICE_VERSION,
+    provider: {
+      organization: "ArgonautWorks",
+      url: PUBLIC_SOURCE,
+    },
+    capabilities: {
+      streaming: false,
+      pushNotifications: false,
+    },
+    documentation: {
+      openapi: `${origin}/openapi.json`,
+      x402: `${origin}/.well-known/x402`,
+      source: PUBLIC_SOURCE,
+    },
+    skills: [
+      {
+        id: "bounty-signal",
+        name: "Check GitHub Bounty Viability",
+        description: "Return an evidence-backed viability verdict before committing implementation time to a public GitHub bounty.",
+        uri: `${origin}/api/v1/check`,
+        method: "POST",
+        security: ["x402"],
+      },
+      {
+        id: "schedule-fit",
+        name: "Find Meeting Overlap",
+        description: "Compute practical meeting windows across time zones from a structured request.",
+        uri: "https://payanagent.com/x402/kh76a21tcy1z0fh5s1vqnwppqs8bt6m8",
+        method: "POST",
+        security: ["x402"],
+      },
+      {
+        id: "bounty-reality-check",
+        name: "Buy Agent Bounty Reality Check",
+        description: "Download a dated screen of 1,291 bounty listings, verified false leads, delivery evidence, and a reusable triage policy.",
+        uri: "https://payanagent.com/x402/kh77jyatx8rsxpmcat6s3a3yf18btx0q",
+        method: "POST",
+        security: ["x402"],
+      },
+    ],
+    securitySchemes: {
+      x402: {
+        type: "x402",
+        description: "USDC payment via x402 on Base mainnet. Call the skill URI without payment to receive exact HTTP 402 requirements.",
+      },
+    },
   });
 });
 
@@ -252,6 +308,7 @@ app.get("/llms.txt", (_request, response) => {
     "Marketplace-compatible endpoint: POST /api/v1/check with JSON {\"url\":\"https://github.com/{owner}/{repo}/issues/{number}\"}",
     `Price: ${PRICE} USDC on Base via x402 v2`,
     "OpenAPI: /openapi.json",
+    "A2A agent card: /.well-known/agent.json",
     "x402 manifest: /.well-known/x402",
     `Source: ${PUBLIC_SOURCE}`,
     "",
