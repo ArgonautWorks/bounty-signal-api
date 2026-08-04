@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bounty Signal"
+  short_description: "Screen GitHub bounties before coding"
+  default_prompt: "Use $bounty-signal to assess whether this GitHub bounty is worth pursuing."
