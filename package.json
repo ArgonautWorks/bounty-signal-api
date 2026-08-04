@@ -1,0 +1,22 @@
+{
+  "name": "argonaut-bounty-signal-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test",
+    "check": "node --check app.mjs && node --check lib/evaluate-github-bounty.mjs && node --check lib/revenue-monitor.mjs && node --check scripts/seed-bazaar.mjs && node --check scripts/monitor-revenue.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@x402/core": "2.20.0",
+    "@x402/evm": "2.20.0",
+    "@x402/express": "2.20.0",
+    "@x402/extensions": "2.20.0",
+    "express": "5.2.1",
+    "viem": "2.55.10"
+  }
+}
