@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  AGENTPACT_ACCEPT_MILESTONE_SELECTOR,
+  AGENTPACT_ESCROW,
+  AGENTPACT_REPORT_PAYOUT_ATOMIC,
   ATELIER_REPORT_PAYOUT_ATOMIC,
   ATELIER_TREASURY,
   ATELIER_X402_REPORT_PAYOUT_ATOMIC,
@@ -100,6 +103,37 @@ test("classifies only the exact Atelier treasury payout for the marketplace repo
     WALLET,
   );
   assert.equal(x402Receipt.revenue_usd, 0.5);
+});
+
+test("classifies only an AgentPact escrow release for the exact report payout", () => {
+  const receipt = classifyBountySignalTransfer(
+    paidLog({
+      topics: [TRANSFER_TOPIC, addressTopic(AGENTPACT_ESCROW), addressTopic(WALLET)],
+      data: `0x${AGENTPACT_REPORT_PAYOUT_ATOMIC.toString(16)}`,
+      transactionHash: "0xagentpact",
+    }),
+    { to: AGENTPACT_ESCROW, input: `${AGENTPACT_ACCEPT_MILESTONE_SELECTOR}00` },
+    WALLET,
+  );
+  assert.deepEqual(receipt, {
+    experiment_id: "E043",
+    kind: "marketplace_revenue",
+    revenue_usd: 0.45,
+    product: "agentpact_bounty_report",
+    transaction: "0xagentpact",
+    payer: AGENTPACT_ESCROW,
+    amount_usdc_atomic: "450000",
+    block_number: 49528401,
+  });
+  assert.match(revenueLedgerRow(receipt), /Settled AgentPact GitHub Bounty Reality Check payout/);
+  assert.equal(classifyBountySignalTransfer(
+    paidLog({
+      topics: [TRANSFER_TOPIC, addressTopic(AGENTPACT_ESCROW), addressTopic(WALLET)],
+      data: `0x${AGENTPACT_REPORT_PAYOUT_ATOMIC.toString(16)}`,
+    }),
+    { to: BASE_USDC, input: `${TRANSFER_SELECTOR}00` },
+    WALLET,
+  ), null);
 });
 
 test("rejects self-seeds, other amounts, and ordinary transfers", () => {

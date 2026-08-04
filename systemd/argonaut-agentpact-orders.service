@@ -1,0 +1,11 @@
+[Unit]
+Description=Accept funded AgentPact work and deliver ArgonautWorks reports
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/oak/argonaut-ventures/bounty-signal-api-public
+ExecStart=/home/oak/.local/share/fnm/aliases/default/bin/node scripts/operate-agentpact.mjs
+NoNewPrivileges=true
+PrivateTmp=true
