@@ -93,9 +93,10 @@ async function main() {
     last_scanned_block: confirmedBlock,
     confirmations: CONFIRMATIONS,
     receipts: [...(prior.receipts ?? []), ...receipts],
-    realized_revenue_usd: ((prior.receipts?.length ?? 0) + receipts.length) / 100,
+    realized_revenue_usd: [...(prior.receipts ?? []), ...receipts]
+      .reduce((total, receipt) => total + Number(receipt.revenue_usd ?? 0.01), 0),
   });
-  console.log(`Scanned ${logs.length} incoming USDC transfer(s); recorded ${receipts.length} paid API call(s)`);
+  console.log(`Scanned ${logs.length} incoming USDC transfer(s); recorded ${receipts.length} paid product call(s)`);
 }
 
 main().catch((error) => {

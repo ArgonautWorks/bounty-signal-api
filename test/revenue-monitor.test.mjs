@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   BASE_USDC,
+  DIRECT_REPORT_PRICE_ATOMIC,
   TRANSFER_TOPIC,
   classifyBountySignalTransfer,
   ledgerDate,
@@ -33,11 +34,34 @@ const paidTransaction = {
 
 test("classifies a confirmed external one-cent EIP-3009 transfer", () => {
   assert.deepEqual(classifyBountySignalTransfer(paidLog(), paidTransaction, WALLET), {
+    experiment_id: "E014",
+    kind: "api_revenue",
+    revenue_usd: 0.01,
+    product: "bounty_check",
     transaction: "0xabc123",
     payer: PAYER,
     amount_usdc_atomic: "10000",
     block_number: 49528401,
   });
+});
+
+test("classifies the distinct direct-report price without colliding with PayanAgent sales", () => {
+  const report = classifyBountySignalTransfer(
+    paidLog({ data: `0x${DIRECT_REPORT_PRICE_ATOMIC.toString(16)}`, transactionHash: "0xreport" }),
+    paidTransaction,
+    WALLET,
+  );
+  assert.deepEqual(report, {
+    experiment_id: "E022",
+    kind: "download_revenue",
+    revenue_usd: 1.99,
+    product: "direct_report",
+    transaction: "0xreport",
+    payer: PAYER,
+    amount_usdc_atomic: "1990000",
+    block_number: 49528401,
+  });
+  assert.match(revenueLedgerRow(report, new Date("2026-08-04T22:30:00.000Z")), /^2026-08-05,E022,download_revenue,0\.00,1\.99,1\.99,/);
 });
 
 test("rejects self-seeds, other amounts, and ordinary transfers", () => {

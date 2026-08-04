@@ -4,6 +4,11 @@ import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { paymentMiddleware, x402ResourceServer } from "@x402/express";
 import { declareDiscoveryExtension } from "@x402/extensions/bazaar";
 import { evaluateGitHubBounty, parseGitHubIssueUrl } from "./lib/evaluate-github-bounty.mjs";
+import {
+  DIRECT_REPORT_PRICE,
+  REPORT_EDITION,
+  loadReportContent,
+} from "./lib/report.mjs";
 
 const PAY_TO = process.env.PAY_TO ?? "0x5e2023b1D1366d6366E768fe432AD627bfAa5d57";
 const NETWORK = process.env.X402_NETWORK ?? "eip155:8453";
@@ -12,7 +17,7 @@ const PRICE = process.env.X402_PRICE ?? "$0.01";
 const CACHE_TTL_MS = 5 * 60 * 1_000;
 const cache = new Map();
 const PUBLIC_SOURCE = "https://github.com/ArgonautWorks/bounty-signal-api";
-const SERVICE_VERSION = "0.1.3";
+const SERVICE_VERSION = "0.2.0";
 const SERVICE_DESCRIPTION = "Canonical GitHub bounty viability checks for agents: live issue state, repository trust, payout evidence, age, claims, assignments, and competing pull requests.";
 const DISCOVERY_GUIDANCE = [
   "Use this API before committing implementation time to a public GitHub issue advertised as a paid bounty.",
@@ -20,6 +25,9 @@ const DISCOVERY_GUIDANCE = [
   "The paid JSON response returns a verdict, score, explicit reasons, and current evidence about issue state, repository trust, payout signals, assignments, claims, and competing pull requests.",
   "Treat reject as a stop signal, caution as a prompt for further verification, and viable as one input to an independent execution decision.",
 ].join(" ");
+const REPORT_CONTENT = process.env.REPORT_CONTENT_B64
+  ? loadReportContent(process.env.REPORT_CONTENT_B64)
+  : null;
 
 if (!/^0x[a-fA-F0-9]{40}$/.test(PAY_TO)) {
   throw new Error("PAY_TO must be an EVM address");
@@ -94,9 +102,69 @@ const paidCheckResource = {
 };
 const paidCheckPostResource = { ...paidCheckResource, extensions: postDiscovery };
 
+const reportDiscovery = declareDiscoveryExtension({
+  input: { edition: REPORT_EDITION },
+  inputSchema: {
+    properties: {
+      edition: {
+        type: "string",
+        const: REPORT_EDITION,
+        description: "Pinned report edition to download.",
+      },
+    },
+    required: ["edition"],
+  },
+  output: {
+    example: {
+      edition: REPORT_EDITION,
+      format: "text/markdown",
+      body: "# Agent Bounty Reality Check — 1,291 listings screened",
+    },
+  },
+});
+
+const reportPostDiscovery = declareDiscoveryExtension({
+  input: { edition: REPORT_EDITION },
+  inputSchema: {
+    properties: {
+      edition: {
+        type: "string",
+        const: REPORT_EDITION,
+        description: "Pinned report edition to download.",
+      },
+    },
+    required: ["edition"],
+  },
+  bodyType: "json",
+  output: {
+    example: {
+      edition: REPORT_EDITION,
+      format: "text/markdown",
+      body: "# Agent Bounty Reality Check — 1,291 listings screened",
+    },
+  },
+});
+
+const paidReportResource = {
+  accepts: [{
+    scheme: "exact",
+    price: DIRECT_REPORT_PRICE,
+    network: NETWORK,
+    payTo: PAY_TO,
+  }],
+  description: "Download the dated Agent Bounty Reality Check: 1,291 listings screened, verified false leads, marketplace delivery evidence, and a reusable triage policy.",
+  mimeType: "text/markdown",
+  serviceName: "ArgonautWorks Agent Bounty Reality Check",
+  tags: ["bounties", "market-research", "agent-tools", "download"],
+  extensions: reportDiscovery,
+};
+const paidReportPostResource = { ...paidReportResource, extensions: reportPostDiscovery };
+
 app.use(paymentMiddleware({
   "GET /api/v1/check": paidCheckResource,
   "POST /api/v1/check": paidCheckPostResource,
+  "GET /api/v1/report": paidReportResource,
+  "POST /api/v1/report": paidReportPostResource,
 }, resourceServer));
 
 app.get("/", (_request, response) => {
@@ -105,6 +173,11 @@ app.get("/", (_request, response) => {
     purpose: "Reject stale, fake, crowded, or unfunded GitHub bounties before an agent spends implementation time.",
     endpoint: "GET with a url query parameter or POST {\"url\":\"https://github.com/{owner}/{repo}/issues/{number}\"} to /api/v1/check",
     price: PRICE,
+    report: {
+      endpoint: `/api/v1/report?edition=${REPORT_EDITION}`,
+      price: DIRECT_REPORT_PRICE,
+      format: "text/markdown",
+    },
     settlement: { protocol: "x402", network: NETWORK, asset: "USDC" },
     health: "/health",
     openapi: "/openapi.json",
@@ -155,7 +228,7 @@ app.get("/.well-known/agent.json", (request, response) => {
         id: "bounty-reality-check",
         name: "Buy Agent Bounty Reality Check",
         description: "Download a dated screen of 1,291 bounty listings, verified false leads, delivery evidence, and a reusable triage policy.",
-        uri: "https://payanagent.com/x402/kh77jyatx8rsxpmcat6s3a3yf18btx0q",
+        uri: `${origin}/api/v1/report`,
         method: "POST",
         security: ["x402"],
       },
@@ -257,6 +330,62 @@ app.get("/openapi.json", (request, response) => {
           },
         },
       },
+      "/api/v1/report": {
+        get: {
+          operationId: "downloadAgentBountyRealityCheck",
+          summary: "Download the Agent Bounty Reality Check",
+          parameters: [{
+            name: "edition",
+            in: "query",
+            required: true,
+            description: "Pinned report edition.",
+            schema: { type: "string", const: REPORT_EDITION },
+            example: REPORT_EDITION,
+          }],
+          "x-payment-info": {
+            price: { mode: "fixed", currency: "USD", amount: "1.99" },
+            protocols: [{ x402: {} }],
+          },
+          responses: {
+            200: {
+              description: "Dated evidence report",
+              content: { "text/markdown": { schema: { type: "string" } } },
+            },
+            402: { description: "x402 Base-USDC payment challenge" },
+            503: { description: "Pinned report content is unavailable" },
+          },
+        },
+        post: {
+          operationId: "downloadAgentBountyRealityCheckFromJson",
+          summary: "Download the Agent Bounty Reality Check",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["edition"],
+                  additionalProperties: false,
+                  properties: { edition: { type: "string", const: REPORT_EDITION } },
+                },
+                example: { edition: REPORT_EDITION },
+              },
+            },
+          },
+          "x-payment-info": {
+            price: { mode: "fixed", currency: "USD", amount: "1.99" },
+            protocols: [{ x402: {} }],
+          },
+          responses: {
+            200: {
+              description: "Dated evidence report",
+              content: { "text/markdown": { schema: { type: "string" } } },
+            },
+            402: { description: "x402 Base-USDC payment challenge" },
+            503: { description: "Pinned report content is unavailable" },
+          },
+        },
+      },
     },
   });
 });
@@ -294,6 +423,22 @@ app.get("/.well-known/x402", (request, response) => {
         asset: "USDC",
         input: { body: { url: "https://github.com/{owner}/{repo}/issues/{number}" } },
       },
+      {
+        resource: `${origin}/api/v1/report`,
+        method: "GET",
+        price: DIRECT_REPORT_PRICE,
+        network: NETWORK,
+        asset: "USDC",
+        input: { queryParams: { edition: REPORT_EDITION } },
+      },
+      {
+        resource: `${origin}/api/v1/report`,
+        method: "POST",
+        price: DIRECT_REPORT_PRICE,
+        network: NETWORK,
+        asset: "USDC",
+        input: { body: { edition: REPORT_EDITION } },
+      },
     ],
   });
 });
@@ -307,6 +452,8 @@ app.get("/llms.txt", (_request, response) => {
     "Paid endpoint: GET /api/v1/check?url=https://github.com/{owner}/{repo}/issues/{number}",
     "Marketplace-compatible endpoint: POST /api/v1/check with JSON {\"url\":\"https://github.com/{owner}/{repo}/issues/{number}\"}",
     `Price: ${PRICE} USDC on Base via x402 v2`,
+    `Paid report: GET /api/v1/report?edition=${REPORT_EDITION} or POST /api/v1/report with JSON {\"edition\":\"${REPORT_EDITION}\"}`,
+    `Direct report price: ${DIRECT_REPORT_PRICE} USDC on Base via x402 v2`,
     "OpenAPI: /openapi.json",
     "A2A agent card: /.well-known/agent.json",
     "x402 manifest: /.well-known/x402",
@@ -323,7 +470,20 @@ app.get("/health", (_request, response) => {
     network: NETWORK,
     facilitator: new URL(FACILITATOR_URL).hostname,
     cache_entries: cache.size,
+    report_available: Boolean(REPORT_CONTENT),
   });
+});
+
+app.all("/api/v1/report", (_request, response) => {
+  if (!REPORT_CONTENT) {
+    response.status(503).json({ error: "report_unavailable" });
+    return;
+  }
+  response
+    .type("text/markdown")
+    .set("content-disposition", `attachment; filename=\"agent-bounty-reality-check-${REPORT_EDITION}.md\"`)
+    .set("x-argonaut-report-edition", REPORT_EDITION)
+    .send(REPORT_CONTENT);
 });
 
 app.all("/api/v1/check", async (request, response) => {

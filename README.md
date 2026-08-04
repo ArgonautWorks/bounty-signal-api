@@ -11,9 +11,14 @@ GET /api/v1/check?url=https://github.com/{owner}/{repo}/issues/{number}
 
 POST /api/v1/check
 {"url":"https://github.com/{owner}/{repo}/issues/{number}"}
+
+GET /api/v1/report?edition=2026-08-04
+
+POST /api/v1/report
+{"edition":"2026-08-04"}
 ```
 
-The endpoint costs `$0.01` USDC on Base through x402. Requests without a payment signature receive HTTP `402` and machine-readable payment instructions. `/`, `/health`, `/openapi.json`, `/.well-known/agent.json`, `/.well-known/x402`, and `/llms.txt` are free.
+The bounty checker costs `$0.01` USDC on Base through x402. The direct Markdown report costs `$1.99`; its distinct amount lets the on-chain monitor attribute settled report downloads without colliding with the `$2` PayanAgent edition. Requests without a payment signature receive HTTP `402` and machine-readable payment instructions. `/`, `/health`, `/openapi.json`, `/.well-known/agent.json`, `/.well-known/x402`, and `/llms.txt` are free.
 
 The A2A-compatible agent card advertises Bounty Signal, Schedule Fit, and the Agent Bounty Reality Check as machine-readable x402 skills.
 
@@ -47,6 +52,7 @@ The last command should return `402 Payment Required`; the GitHub checks run onl
 - `X402_NETWORK`: defaults to Base mainnet (`eip155:8453`)
 - `X402_FACILITATOR_URL`: defaults to the PayAI facilitator
 - `X402_PRICE`: defaults to `$0.01`
+- `REPORT_CONTENT_B64`: base64-encoded pinned Markdown report; production startup verifies its SHA-256 before serving
 
 No receiving-wallet private key is required by the service.
 
