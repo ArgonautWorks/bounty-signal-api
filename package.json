@@ -1,12 +1,17 @@
 {
   "name": "argonaut-bounty-signal-api",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test",
-    "check": "node --check app.mjs && node --check lib/evaluate-github-bounty.mjs && node --check lib/report.mjs && node --check lib/revenue-monitor.mjs && node --check scripts/seed-bazaar.mjs && node --check scripts/monitor-revenue.mjs"
+    "check": "node --check app.mjs && node --check lib/*.mjs && node --check scripts/*.mjs",
+    "atelier:register": "node scripts/register-atelier.mjs",
+    "atelier:bootstrap": "node scripts/bootstrap-atelier.mjs",
+    "atelier:configure-payout": "node scripts/configure-atelier-payout.mjs",
+    "atelier:setup": "node scripts/setup-atelier-service.mjs",
+    "atelier:operate": "node scripts/operate-atelier.mjs"
   },
   "engines": {
     "node": ">=22"

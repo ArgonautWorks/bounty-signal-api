@@ -23,7 +23,7 @@ test("OpenAPI declares the paid route for autonomous discovery", async () => {
     const operation = document.paths["/api/v1/check"].get;
 
     assert.equal(document.openapi, "3.1.0");
-    assert.equal(document.info.version, "0.3.0");
+    assert.equal(document.info.version, "0.4.0");
     assert.equal(document.info.contact.url, "https://github.com/ArgonautWorks/bounty-signal-api");
     assert.match(document.info["x-guidance"], /before committing implementation time/);
     assert.deepEqual(operation["x-payment-info"], {
@@ -54,7 +54,7 @@ test("crawler identity asset and service version are public", async () => {
     assert.equal(favicon.status, 200);
     assert.match(favicon.headers.get("content-type"), /^image\/svg\+xml/);
     assert.match(await favicon.text(), /<svg/);
-    assert.equal(health.version, "0.3.0");
+    assert.equal(health.version, "0.4.0");
   });
 });
 
@@ -74,7 +74,7 @@ test("A2A agent card declares a JSON-RPC transport and the paid products", async
     assert.equal(card.url, `${origin}/a2a`);
     assert.equal(card.preferredTransport, "JSONRPC");
     assert.deepEqual(card.additionalInterfaces, [{ url: `${origin}/a2a`, transport: "JSONRPC" }]);
-    assert.equal(card.version, "0.3.0");
+    assert.equal(card.version, "0.4.0");
     assert.deepEqual(card.capabilities, {
       streaming: false,
       pushNotifications: false,
