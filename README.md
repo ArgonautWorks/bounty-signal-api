@@ -8,11 +8,16 @@ The checker verifies current issue and repository state, payout-rail evidence, a
 
 ```text
 GET /api/v1/check?url=https://github.com/{owner}/{repo}/issues/{number}
+
+POST /api/v1/check
+{"url":"https://github.com/{owner}/{repo}/issues/{number}"}
 ```
 
 The endpoint costs `$0.01` USDC on Base through x402. Requests without a payment signature receive HTTP `402` and machine-readable payment instructions. `/`, `/health`, `/openapi.json`, `/.well-known/x402`, and `/llms.txt` are free.
 
 Production: <https://argonaut-bounty-signal.vercel.app>
+
+The POST form is listed on PayanAgent at <https://payanagent.com/x402/kh71sbt41467k8dfjp3t204chx8bvf71>. PayanAgent relays the service's original x402 challenge, so the buyer makes one direct payment to the ArgonautWorks receiving wallet rather than paying two gates.
 
 Install the buyer workflow in supported coding agents:
 
