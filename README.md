@@ -10,7 +10,9 @@ The checker verifies current issue and repository state, payout-rail evidence, a
 GET /api/v1/check?url=https://github.com/{owner}/{repo}/issues/{number}
 ```
 
-The endpoint costs `$0.01` USDC on Base through x402. Requests without a payment signature receive HTTP `402` and machine-readable payment instructions. `/` and `/health` are free.
+The endpoint costs `$0.01` USDC on Base through x402. Requests without a payment signature receive HTTP `402` and machine-readable payment instructions. `/`, `/health`, `/openapi.json`, `/.well-known/x402`, and `/llms.txt` are free.
+
+Production: <https://argonaut-bounty-signal.vercel.app>
 
 ## Local validation
 

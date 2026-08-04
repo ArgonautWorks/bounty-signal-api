@@ -11,6 +11,8 @@ const FACILITATOR_URL = process.env.X402_FACILITATOR_URL ?? "https://facilitator
 const PRICE = process.env.X402_PRICE ?? "$0.01";
 const CACHE_TTL_MS = 5 * 60 * 1_000;
 const cache = new Map();
+const PUBLIC_SOURCE = "https://github.com/ArgonautWorks/bounty-signal-api";
+const SERVICE_DESCRIPTION = "Canonical GitHub bounty viability checks for agents: live issue state, repository trust, payout evidence, age, claims, assignments, and competing pull requests.";
 
 if (!/^0x[a-fA-F0-9]{40}$/.test(PAY_TO)) {
   throw new Error("PAY_TO must be an EVM address");
@@ -56,6 +58,8 @@ app.use(paymentMiddleware({
     }],
     description: "Canonical GitHub bounty viability check for agents: issue state, repo trust, payout evidence, age, claims and competing PRs. Prevents wasted coding on stale or fake rewards.",
     mimeType: "application/json",
+    serviceName: "ArgonautWorks Bounty Signal",
+    tags: ["github", "bounties", "agent-tools", "due-diligence"],
     extensions: discovery,
   },
 }, resourceServer));
@@ -68,8 +72,78 @@ app.get("/", (_request, response) => {
     price: PRICE,
     settlement: { protocol: "x402", network: NETWORK, asset: "USDC" },
     health: "/health",
-    source: "https://github.com/ArgonautWorks/venture-lab",
+    openapi: "/openapi.json",
+    x402_manifest: "/.well-known/x402",
+    source: PUBLIC_SOURCE,
   });
+});
+
+app.get("/openapi.json", (request, response) => {
+  const origin = `${request.protocol}://${request.get("host")}`;
+  response.json({
+    openapi: "3.1.0",
+    info: {
+      title: "ArgonautWorks Bounty Signal API",
+      version: "0.1.0",
+      description: SERVICE_DESCRIPTION,
+      license: { name: "MIT", identifier: "MIT" },
+    },
+    servers: [{ url: origin }],
+    paths: {
+      "/api/v1/check": {
+        get: {
+          operationId: "checkGitHubBounty",
+          summary: "Check whether a public GitHub bounty is worth pursuing",
+          parameters: [{
+            name: "url",
+            in: "query",
+            required: true,
+            schema: { type: "string", format: "uri" },
+            example: "https://github.com/electron/electron/issues/48191",
+          }],
+          responses: {
+            200: { description: "Evidence-backed viability decision" },
+            400: { description: "Invalid GitHub issue URL" },
+            402: { description: "x402 Base-USDC payment challenge" },
+            502: { description: "Upstream GitHub lookup failed" },
+          },
+        },
+      },
+    },
+  });
+});
+
+app.get("/.well-known/x402", (request, response) => {
+  const origin = `${request.protocol}://${request.get("host")}`;
+  response.json({
+    x402Version: 2,
+    serviceName: "ArgonautWorks Bounty Signal",
+    description: SERVICE_DESCRIPTION,
+    source: PUBLIC_SOURCE,
+    resources: [{
+      resource: `${origin}/api/v1/check`,
+      method: "GET",
+      price: PRICE,
+      network: NETWORK,
+      asset: "USDC",
+      input: { queryParams: { url: "https://github.com/{owner}/{repo}/issues/{number}" } },
+    }],
+  });
+});
+
+app.get("/llms.txt", (_request, response) => {
+  response.type("text/plain").send([
+    "# ArgonautWorks Bounty Signal API",
+    "",
+    SERVICE_DESCRIPTION,
+    "",
+    "Paid endpoint: GET /api/v1/check?url=https://github.com/{owner}/{repo}/issues/{number}",
+    `Price: ${PRICE} USDC on Base via x402 v2`,
+    "OpenAPI: /openapi.json",
+    "x402 manifest: /.well-known/x402",
+    `Source: ${PUBLIC_SOURCE}`,
+    "",
+  ].join("\n"));
 });
 
 app.get("/health", (_request, response) => {
