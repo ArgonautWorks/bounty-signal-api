@@ -60,10 +60,16 @@ No receiving-wallet private key is required by the service.
 
 PayAI catalogs Bazaar declarations during verification or settlement. `scripts/seed-bazaar.mjs` waits until the existing receiving wallet contains at least one cent of USDC, validates that the live challenge is a Base-USDC self-payment capped at one cent, then performs that self-payment to seed discovery with zero net principal spend. The systemd timer retries every 30 minutes and stops acting after a successful seed.
 
-`scripts/monitor-revenue.mjs` independently scans confirmed Base USDC events. Direct x402 sales require an external `transferWithAuthorization` matching an exact product price. Atelier sales require an exact $0.45 or $0.50 ordinary transfer from the verified marketplace treasury. Self-seeds, unrelated transfers, other amounts, and duplicate transactions are excluded. Its state file is mode `0600`.
+`scripts/monitor-revenue.mjs` independently scans confirmed Base USDC events. Direct x402 sales require an external `transferWithAuthorization` matching an exact product price. Atelier sales require an exact $0.45 or $0.50 ordinary transfer from the verified marketplace treasury. AgentPact sales require the exact $0.45 seller leg emitted by its verified escrow contract's `acceptMilestone` call. Self-seeds, unrelated transfers, other amounts, and duplicate transactions are excluded. Its state file is mode `0600`.
 
 ## Atelier marketplace seller
 
 The same evaluator is packaged as the fixed-price **GitHub Bounty Reality Check** on Atelier. A required structured field collects one canonical public GitHub issue URL. The VPS worker polls only actionable paid orders, creates a 30-day EIP-191-signed report link, verifies it, delivers it, and messages the buyer without operator input. The public report route accepts only links signed by the payout wallet, so it does not expose a free bypass around the x402 API.
 
 Atelier credentials and its Solana ownership identity live only in mode-`0600` state outside this repository. Marketplace proceeds are routed to the same Base wallet as direct x402 sales. The revenue monitor recognizes only exact $0.45 or $0.50 USDC payouts sent by Atelier's verified Base treasury, accounting for the UI and x402 fee paths without trusting marketplace status alone.
+
+## AgentPact marketplace seller
+
+The same fixed-scope report is also listed on AgentPact for `$0.50` USDC. Registration, listing, polling, acceptance, and delivery are entirely machine-operated. The worker accepts only the exact ArgonautWorks offer, exact price, one report-link milestone, a canonical public GitHub issue URL, and non-security scope. It never buys services or sends funds.
+
+AgentPact database status is not enough to trigger delivery. Before creating a signed report link, the worker independently retrieves the Base transaction receipt and requires a successful native-USDC transfer of at least `$0.50` into AgentPact's verified escrow contract. Credentials and delivery memory are private mode-`0600` state outside the repository. The revenue monitor records only the later exact `$0.45` escrow release to the ArgonautWorks wallet.

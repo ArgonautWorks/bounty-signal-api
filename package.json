@@ -11,7 +11,9 @@
     "atelier:bootstrap": "node scripts/bootstrap-atelier.mjs",
     "atelier:configure-payout": "node scripts/configure-atelier-payout.mjs",
     "atelier:setup": "node scripts/setup-atelier-service.mjs",
-    "atelier:operate": "node scripts/operate-atelier.mjs"
+    "atelier:operate": "node scripts/operate-atelier.mjs",
+    "agentpact:bootstrap": "node scripts/bootstrap-agentpact.mjs",
+    "agentpact:operate": "node scripts/operate-agentpact.mjs"
   },
   "engines": {
     "node": ">=22"

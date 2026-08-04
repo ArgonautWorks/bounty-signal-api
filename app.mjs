@@ -6,8 +6,11 @@ import { paymentMiddleware, x402ResourceServer } from "@x402/express";
 import { declareDiscoveryExtension } from "@x402/extensions/bazaar";
 import { evaluateGitHubBounty, parseGitHubIssueUrl } from "./lib/evaluate-github-bounty.mjs";
 import {
+  AgentPactReportAccessError,
   AtelierReportAccessError,
+  authorizeAgentPactReport,
   authorizeAtelierReport,
+  renderAgentPactReport,
   renderAtelierReport,
 } from "./lib/atelier-report.mjs";
 import {
@@ -557,6 +560,29 @@ app.get("/api/v1/atelier-report", async (request, response) => {
       .send(renderAtelierReport(result, access.orderId));
   } catch (error) {
     if (error instanceof AtelierReportAccessError) {
+      response.status(error.status).json({ error: error.message });
+      return;
+    }
+    const message = error instanceof Error ? error.message : "Unable to evaluate bounty";
+    const status = /must (?:be|use|match)|valid GitHub issue URL/.test(message) ? 400 : 502;
+    response.status(status).json({ error: message });
+  }
+});
+
+app.get("/api/v1/agentpact-report", async (request, response) => {
+  try {
+    const access = await authorizeAgentPactReport(request.query, PAY_TO);
+    const cached = cache.get(access.target.canonicalUrl);
+    const cacheHit = cached && Date.now() - cached.createdAt < CACHE_TTL_MS;
+    const result = cacheHit ? cached.value : await evaluateGitHubBounty(access.target.canonicalUrl);
+    if (!cacheHit) cache.set(access.target.canonicalUrl, { createdAt: Date.now(), value: result });
+    response
+      .type("text/html")
+      .set("cache-control", "private, max-age=300")
+      .set("x-robots-tag", "noindex, nofollow")
+      .send(renderAgentPactReport(result, access.dealId));
+  } catch (error) {
+    if (error instanceof AgentPactReportAccessError) {
       response.status(error.status).json({ error: error.message });
       return;
     }
