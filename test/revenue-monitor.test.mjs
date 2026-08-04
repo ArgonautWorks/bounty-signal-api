@@ -8,11 +8,14 @@ import {
   ATELIER_TREASURY,
   ATELIER_X402_REPORT_PAYOUT_ATOMIC,
   BASE_USDC,
+  BASE_PULSE_PAYAN_OFFER_ID,
   DIRECT_REPORT_PRICE_ATOMIC,
+  PAYAN_AGENT_ID,
   TRANSFER_SELECTOR,
   TRANSFER_TOPIC,
   classifyBountySignalTransfer,
   ledgerDate,
+  qualifyingBasePulsePayanReceipt,
   revenueLedgerRow,
 } from "../lib/revenue-monitor.mjs";
 
@@ -38,6 +41,24 @@ const paidTransaction = {
   to: BASE_USDC,
   input: "0xe3ee160e00000000",
 };
+
+test("identifies only the exact delivered Base Pulse marketplace receipt", () => {
+  const receipt = {
+    offerId: BASE_PULSE_PAYAN_OFFER_ID,
+    sellerId: PAYAN_AGENT_ID,
+    buyerId: "independent-buyer",
+    status: "confirmed",
+    delivered: true,
+    settlementType: "direct",
+    network: "eip155:8453",
+    amountMicroUsd: 10_000,
+    txHash: `0x${"a".repeat(64)}`,
+  };
+  assert.equal(qualifyingBasePulsePayanReceipt(receipt), true);
+  assert.equal(qualifyingBasePulsePayanReceipt({ ...receipt, offerId: "other" }), false);
+  assert.equal(qualifyingBasePulsePayanReceipt({ ...receipt, delivered: false }), false);
+  assert.equal(qualifyingBasePulsePayanReceipt({ ...receipt, amountMicroUsd: 20_000 }), false);
+});
 
 test("classifies a confirmed external one-cent EIP-3009 transfer", () => {
   assert.deepEqual(classifyBountySignalTransfer(paidLog(), paidTransaction, WALLET), {
