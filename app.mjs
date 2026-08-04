@@ -1,4 +1,5 @@
 import express from "express";
+import { randomUUID } from "node:crypto";
 import { HTTPFacilitatorClient } from "@x402/core/server";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { paymentMiddleware, x402ResourceServer } from "@x402/express";
@@ -17,7 +18,7 @@ const PRICE = process.env.X402_PRICE ?? "$0.01";
 const CACHE_TTL_MS = 5 * 60 * 1_000;
 const cache = new Map();
 const PUBLIC_SOURCE = "https://github.com/ArgonautWorks/bounty-signal-api";
-const SERVICE_VERSION = "0.2.0";
+const SERVICE_VERSION = "0.3.0";
 const SERVICE_DESCRIPTION = "Canonical GitHub bounty viability checks for agents: live issue state, repository trust, payout evidence, age, claims, assignments, and competing pull requests.";
 const DISCOVERY_GUIDANCE = [
   "Use this API before committing implementation time to a public GitHub issue advertised as a paid bounty.",
@@ -181,18 +182,23 @@ app.get("/", (_request, response) => {
     settlement: { protocol: "x402", network: NETWORK, asset: "USDC" },
     health: "/health",
     openapi: "/openapi.json",
-    agent_card: "/.well-known/agent.json",
+    agent_card: "/.well-known/agent-card.json",
+    a2a: "/a2a",
     x402_manifest: "/.well-known/x402",
     source: PUBLIC_SOURCE,
   });
 });
 
-app.get("/.well-known/agent.json", (request, response) => {
+app.get(["/.well-known/agent.json", "/.well-known/agent-card.json"], (request, response) => {
   const origin = `${request.protocol}://${request.get("host")}`;
+  const a2aUrl = `${origin}/a2a`;
   response.json({
-    name: "ArgonautWorks",
+    protocolVersion: "0.3",
+    name: "ArgonautWorks Bounty Signal",
     description: "Autonomous due-diligence tools and evidence products that help agents avoid wasting time on stale, fake, crowded, or unfunded work.",
-    url: origin,
+    url: a2aUrl,
+    preferredTransport: "JSONRPC",
+    additionalInterfaces: [{ url: a2aUrl, transport: "JSONRPC" }],
     version: SERVICE_VERSION,
     provider: {
       organization: "ArgonautWorks",
@@ -201,42 +207,87 @@ app.get("/.well-known/agent.json", (request, response) => {
     capabilities: {
       streaming: false,
       pushNotifications: false,
+      stateTransitionHistory: false,
     },
-    documentation: {
-      openapi: `${origin}/openapi.json`,
-      x402: `${origin}/.well-known/x402`,
-      source: PUBLIC_SOURCE,
-    },
+    documentationUrl: `${origin}/openapi.json`,
+    defaultInputModes: ["text/plain", "application/json"],
+    defaultOutputModes: ["text/plain", "application/json"],
     skills: [
       {
         id: "bounty-signal",
         name: "Check GitHub Bounty Viability",
         description: "Return an evidence-backed viability verdict before committing implementation time to a public GitHub bounty.",
-        uri: `${origin}/api/v1/check`,
-        method: "POST",
-        security: ["x402"],
+        tags: ["github", "bounties", "due-diligence", "x402"],
+        examples: ["How can I check whether a GitHub bounty is worth pursuing?"],
       },
       {
         id: "schedule-fit",
         name: "Find Meeting Overlap",
         description: "Compute practical meeting windows across time zones from a structured request.",
-        uri: "https://payanagent.com/x402/kh76a21tcy1z0fh5s1vqnwppqs8bt6m8",
-        method: "POST",
-        security: ["x402"],
+        tags: ["scheduling", "time-zones", "agents", "x402"],
+        examples: ["Where do New York and Berlin business hours overlap?"],
       },
       {
         id: "bounty-reality-check",
         name: "Buy Agent Bounty Reality Check",
         description: "Download a dated screen of 1,291 bounty listings, verified false leads, delivery evidence, and a reusable triage policy.",
-        uri: `${origin}/api/v1/report`,
-        method: "POST",
-        security: ["x402"],
+        tags: ["bounties", "research", "market-data", "x402"],
+        examples: ["Where can I get the current Agent Bounty Reality Check?"],
       },
     ],
-    securitySchemes: {
-      x402: {
-        type: "x402",
-        description: "USDC payment via x402 on Base mainnet. Call the skill URI without payment to receive exact HTTP 402 requirements.",
+  });
+});
+
+app.post("/a2a", (request, response) => {
+  const body = request.body;
+  const requestId = body?.id ?? null;
+
+  if (!body || body.jsonrpc !== "2.0" || !["message/send", "SendMessage"].includes(body.method)) {
+    response.status(200).json({
+      jsonrpc: "2.0",
+      id: requestId,
+      error: {
+        code: body?.method ? -32601 : -32600,
+        message: body?.method ? "Method not found" : "Invalid Request",
+      },
+    });
+    return;
+  }
+
+  const origin = `${request.protocol}://${request.get("host")}`;
+  const incoming = body.params?.message;
+  const contextId = incoming?.contextId ?? randomUUID();
+  const taskId = incoming?.taskId ?? randomUUID();
+  const history = incoming && typeof incoming === "object"
+    ? [{ ...incoming, kind: "message", contextId, taskId }]
+    : [];
+
+  response.json({
+    jsonrpc: "2.0",
+    id: requestId,
+    result: {
+      contextId,
+      history,
+      id: taskId,
+      kind: "task",
+      status: {
+        state: "completed",
+        timestamp: new Date().toISOString(),
+        message: {
+          kind: "message",
+          messageId: randomUUID(),
+          role: "agent",
+          parts: [{
+            kind: "text",
+            text: [
+              "ArgonautWorks provides three machine-buyable tools:",
+              `(1) check GitHub bounty viability at ${origin}/api/v1/check,`,
+              "(2) calculate cross-time-zone meeting overlap at https://argonaut-schedule-fit.vercel.app/api/v1/overlap,",
+              `(3) download the Agent Bounty Reality Check at ${origin}/api/v1/report.`,
+              `Read ${origin}/openapi.json and ${origin}/.well-known/x402 for exact inputs and Base-USDC x402 prices.`,
+            ].join(" "),
+          }],
+        },
       },
     },
   });
@@ -455,7 +506,8 @@ app.get("/llms.txt", (_request, response) => {
     `Paid report: GET /api/v1/report?edition=${REPORT_EDITION} or POST /api/v1/report with JSON {\"edition\":\"${REPORT_EDITION}\"}`,
     `Direct report price: ${DIRECT_REPORT_PRICE} USDC on Base via x402 v2`,
     "OpenAPI: /openapi.json",
-    "A2A agent card: /.well-known/agent.json",
+    "A2A agent card: /.well-known/agent-card.json (legacy alias: /.well-known/agent.json)",
+    "A2A JSON-RPC endpoint: POST /a2a",
     "x402 manifest: /.well-known/x402",
     `Source: ${PUBLIC_SOURCE}`,
     "",
