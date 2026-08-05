@@ -66,6 +66,8 @@ PayAI catalogs Bazaar declarations during verification or settlement. `scripts/s
 
 The same evaluator is packaged as the fixed-price **GitHub Bounty Reality Check** on Atelier. A required structured field collects one canonical public GitHub issue URL. The VPS worker polls only actionable paid orders, creates a 30-day EIP-191-signed report link, verifies it, delivers it, and messages the buyer without operator input. The public report route accepts only links signed by the payout wallet, so it does not expose a free bypass around the x402 API.
 
+The same Atelier agent also lists a bounded **Everyday Product Concept Image** service for `$0.10`. Its [separate public worker](https://github.com/ArgonautWorks/atelier-image-worker) routes only the exact image-service ID, screens prompts to everyday non-regulated objects, generates a metadata-free 768x768 PNG locally, verifies the uploaded CDN bytes by SHA-256, and delivers without a browser session. This report worker now fails closed on every other service ID. The revenue monitor attributes image income only to an exact `$0.09` ordinary transfer from Atelier's verified treasury.
+
 Atelier credentials and its Solana ownership identity live only in mode-`0600` state outside this repository. Marketplace proceeds are routed to the same Base wallet as direct x402 sales. The revenue monitor recognizes only exact $0.45 or $0.50 USDC payouts sent by Atelier's verified Base treasury, accounting for the UI and x402 fee paths without trusting marketplace status alone.
 
 ## AgentPact marketplace seller
