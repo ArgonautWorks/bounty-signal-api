@@ -23,7 +23,7 @@ test("OpenAPI declares the paid route for autonomous discovery", async () => {
     const operation = document.paths["/api/v1/check"].get;
 
     assert.equal(document.openapi, "3.1.0");
-    assert.equal(document.info.version, "0.4.0");
+    assert.equal(document.info.version, "0.5.0");
     assert.equal(document.info.contact.url, "https://github.com/ArgonautWorks/bounty-signal-api");
     assert.match(document.info["x-guidance"], /before committing implementation time/);
     assert.deepEqual(operation["x-payment-info"], {
@@ -41,6 +41,50 @@ test("OpenAPI declares the paid route for autonomous discovery", async () => {
       document.paths["/api/v1/check"].post.requestBody.content["application/json"].schema.required,
       ["url"],
     );
+    assert.equal(document.paths["/api/v1/sample"].get.operationId, "getBountyCheckSample");
+  });
+});
+
+test("serves an indexed HTML landing page without breaking JSON discovery", async () => {
+  await withServer(async (origin) => {
+    const [htmlResponse, jsonResponse, sampleResponse] = await Promise.all([
+      fetch(`${origin}/`, { headers: { accept: "text/html" } }),
+      fetch(`${origin}/`, { headers: { accept: "application/json" } }),
+      fetch(`${origin}/api/v1/sample`),
+    ]);
+
+    assert.match(htmlResponse.headers.get("content-type"), /^text\/html/);
+    const html = await htmlResponse.text();
+    assert.match(html, /Don't code a stale bounty/);
+    assert.match(html, /application\/ld\+json/);
+    assert.match(html, /rel="canonical"/);
+
+    assert.match(jsonResponse.headers.get("content-type"), /^application\/json/);
+    const discovery = await jsonResponse.json();
+    assert.equal(discovery.sample, "/api/v1/sample");
+
+    const sample = await sampleResponse.json();
+    assert.equal(sample.static_sample, true);
+    assert.equal(sample.verdict, "reject");
+    assert.match(sample.evidence.note, /Illustrative response shape only/);
+  });
+});
+
+test("publishes crawler discovery and IndexNow ownership assets", async () => {
+  await withServer(async (origin) => {
+    const key = "4ca1b627c7308a53827702b294a67590";
+    const [robots, sitemap, keyResponse] = await Promise.all([
+      fetch(`${origin}/robots.txt`),
+      fetch(`${origin}/sitemap.xml`),
+      fetch(`${origin}/${key}.txt`),
+    ]);
+
+    assert.match(await robots.text(), /Sitemap: https:\/\/argonaut-bounty-signal\.vercel\.app\/sitemap\.xml/);
+    assert.match(sitemap.headers.get("content-type"), /application\/xml/);
+    const xml = await sitemap.text();
+    assert.match(xml, /<loc>https:\/\/argonaut-bounty-signal\.vercel\.app\/<\/loc>/);
+    assert.match(xml, /\/api\/v1\/sample/);
+    assert.equal(await keyResponse.text(), key);
   });
 });
 
@@ -54,7 +98,7 @@ test("crawler identity asset and service version are public", async () => {
     assert.equal(favicon.status, 200);
     assert.match(favicon.headers.get("content-type"), /^image\/svg\+xml/);
     assert.match(await favicon.text(), /<svg/);
-    assert.equal(health.version, "0.4.0");
+    assert.equal(health.version, "0.5.0");
   });
 });
 
@@ -74,7 +118,7 @@ test("A2A agent card declares a JSON-RPC transport and the paid products", async
     assert.equal(card.url, `${origin}/a2a`);
     assert.equal(card.preferredTransport, "JSONRPC");
     assert.deepEqual(card.additionalInterfaces, [{ url: `${origin}/a2a`, transport: "JSONRPC" }]);
-    assert.equal(card.version, "0.4.0");
+    assert.equal(card.version, "0.5.0");
     assert.deepEqual(card.capabilities, {
       streaming: false,
       pushNotifications: false,
