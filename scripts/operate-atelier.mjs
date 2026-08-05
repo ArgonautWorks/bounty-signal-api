@@ -6,6 +6,7 @@ import {
   DEFAULT_WALLET_STATE,
   extractGitHubIssueUrl,
   loadPrivateJson,
+  orderMatchesService,
   writePrivateJson,
 } from "../lib/atelier-operator.mjs";
 
@@ -36,6 +37,7 @@ let stateChanged = false;
 
 for (const order of orders) {
   if (!order?.id || !["paid", "in_progress", "revision_requested"].includes(order.status)) continue;
+  if (!orderMatchesService(order, state.service_id)) continue;
   let targetUrl = extractGitHubIssueUrl(order);
   if (!targetUrl) {
     try {
