@@ -26,7 +26,9 @@ const PRICE = process.env.X402_PRICE ?? "$0.01";
 const CACHE_TTL_MS = 5 * 60 * 1_000;
 const cache = new Map();
 const PUBLIC_SOURCE = "https://github.com/ArgonautWorks/bounty-signal-api";
-const SERVICE_VERSION = "0.4.0";
+const CANONICAL_ORIGIN = "https://argonaut-bounty-signal.vercel.app";
+const INDEXNOW_KEY = "4ca1b627c7308a53827702b294a67590";
+const SERVICE_VERSION = "0.5.0";
 const SERVICE_DESCRIPTION = "Canonical GitHub bounty viability checks for agents: live issue state, repository trust, payout evidence, age, claims, assignments, and competing pull requests.";
 const DISCOVERY_GUIDANCE = [
   "Use this API before committing implementation time to a public GitHub issue advertised as a paid bounty.",
@@ -37,6 +39,115 @@ const DISCOVERY_GUIDANCE = [
 const REPORT_CONTENT = process.env.REPORT_CONTENT_B64
   ? loadReportContent(process.env.REPORT_CONTENT_B64)
   : null;
+const SAMPLE_CHECK = Object.freeze({
+  static_sample: true,
+  input: "https://github.com/electron/electron/issues/48191",
+  verdict: "reject",
+  score: 0,
+  reasons: ["canonical_issue_closed", "existing_competition"],
+  evidence: {
+    canonical_issue_state: "closed",
+    competing_pull_requests: 12,
+    note: "Illustrative response shape only; buy a live check for current evidence.",
+  },
+  paid_endpoint: `${CANONICAL_ORIGIN}/api/v1/check`,
+  price: PRICE,
+  network: NETWORK,
+});
+
+function renderLandingPage() {
+  const structuredData = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "ArgonautWorks Bounty Signal",
+    applicationCategory: "DeveloperApplication",
+    operatingSystem: "Any",
+    description: SERVICE_DESCRIPTION,
+    url: CANONICAL_ORIGIN,
+    codeRepository: PUBLIC_SOURCE,
+    offers: {
+      "@type": "Offer",
+      price: "0.01",
+      priceCurrency: "USD",
+      description: "One live GitHub bounty viability check, settled in USDC on Base via x402.",
+    },
+  }).replaceAll("<", "\\u003c");
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GitHub Bounty Checker for AI Agents | Bounty Signal</title>
+  <meta name="description" content="Check whether a GitHub bounty is open, funded, uncontested, and worth pursuing before an autonomous coding agent starts work. One cent via x402 on Base.">
+  <link rel="canonical" href="${CANONICAL_ORIGIN}/">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Bounty Signal — don't code stale bounties">
+  <meta property="og:description" content="Live GitHub issue, payout, assignment, claim, repository, and competing-PR evidence for autonomous coding agents.">
+  <meta property="og:url" content="${CANONICAL_ORIGIN}/">
+  <meta name="twitter:card" content="summary">
+  <script type="application/ld+json">${structuredData}</script>
+  <style>
+    :root{color-scheme:dark;--bg:#090b10;--panel:#11151d;--line:#273041;--text:#f5f7fb;--muted:#a8b1c1;--accent:#79f2c0;--warn:#ffca6a;--danger:#ff7d8c}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 72% 0,#17293a 0,transparent 34rem),var(--bg);color:var(--text);font:16px/1.6 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{width:min(1080px,calc(100% - 40px));margin:auto}header{display:flex;align-items:center;justify-content:space-between;padding:24px 0}.brand{display:flex;align-items:center;gap:10px;color:var(--text);font-weight:750;text-decoration:none}.mark{display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--line);border-radius:10px;background:#171b24}.nav{display:flex;gap:18px}.nav a{color:var(--muted);text-decoration:none;font-size:14px}.nav a:hover{color:var(--text)}main{padding:78px 0 90px}.hero{display:grid;grid-template-columns:1.16fr .84fr;gap:58px;align-items:center}.eyebrow{display:inline-flex;gap:8px;align-items:center;color:var(--accent);font:700 12px/1.2 ui-monospace,SFMono-Regular,monospace;letter-spacing:.12em;text-transform:uppercase}.dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 16px var(--accent)}h1{max-width:760px;margin:18px 0 22px;font-size:clamp(44px,7vw,78px);line-height:.98;letter-spacing:-.055em}.lede{max-width:670px;color:var(--muted);font-size:19px}.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px}.btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 17px;border:1px solid var(--line);border-radius:10px;color:var(--text);text-decoration:none;font-weight:700}.btn.primary{border-color:var(--accent);background:var(--accent);color:#07110d}.btn:hover{transform:translateY(-1px)}.price{margin-top:18px;color:var(--muted);font-size:13px}.price strong{color:var(--text)}.card{border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,rgba(20,26,36,.96),rgba(12,15,21,.96));box-shadow:0 24px 70px rgba(0,0,0,.3);overflow:hidden}.card-head{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line);font:700 12px/1 ui-monospace,SFMono-Regular,monospace;color:var(--muted)}.verdict{color:var(--danger)}pre{margin:0;padding:20px;white-space:pre-wrap;overflow:auto;font:13px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;color:#d7deeb}.k{color:#8ab4ff}.s{color:#a8e6c1}.n{color:var(--warn)}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:80px}.feature{padding:24px;border:1px solid var(--line);border-radius:14px;background:rgba(17,21,29,.72)}.feature h2{margin:0 0 8px;font-size:17px}.feature p{margin:0;color:var(--muted);font-size:14px}.how{display:grid;grid-template-columns:.85fr 1.15fr;gap:38px;margin-top:80px;align-items:start}.how h2{font-size:34px;line-height:1.1;margin:0 0 14px}.how p{color:var(--muted)}code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.snippet{padding:20px;border:1px solid var(--line);border-radius:14px;background:#07090d;overflow:auto;color:#cce7da;font-size:13px}.proof{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.pill{padding:6px 9px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:12px}footer{border-top:1px solid var(--line);padding:24px 0 42px;color:var(--muted);font-size:13px}.foot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}.foot a{color:var(--muted)}@media(max-width:800px){main{padding-top:40px}.hero,.how{grid-template-columns:1fr}.hero{gap:36px}.grid{grid-template-columns:1fr;margin-top:58px}.nav{display:none}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <a class="brand" href="/"><span class="mark">A</span> ArgonautWorks</a>
+      <nav class="nav"><a href="#evidence">Evidence</a><a href="#use">Use the API</a><a href="${PUBLIC_SOURCE}">Source</a></nav>
+    </header>
+    <main>
+      <section class="hero">
+        <div>
+          <span class="eyebrow"><span class="dot"></span>Live GitHub due diligence</span>
+          <h1>Don't code a stale bounty.</h1>
+          <p class="lede">Bounty Signal checks the canonical issue, repository, payout evidence, assignments, claims, and competing pull requests before your coding agent spends hours on the wrong job.</p>
+          <div class="actions">
+            <a class="btn primary" href="/api/v1/sample">View a sample verdict</a>
+            <a class="btn" href="/api/v1/check?url=https%3A%2F%2Fgithub.com%2Felectron%2Felectron%2Fissues%2F48191">Inspect the x402 challenge</a>
+          </div>
+          <p class="price"><strong>$0.01 USDC</strong> per live check · Base mainnet · no account or API key</p>
+        </div>
+        <div class="card" aria-label="Sample rejection response">
+          <div class="card-head"><span>STATIC RESPONSE SAMPLE</span><span class="verdict">REJECT</span></div>
+          <pre>{
+  <span class="k">"verdict"</span>: <span class="s">"reject"</span>,
+  <span class="k">"score"</span>: <span class="n">0</span>,
+  <span class="k">"reasons"</span>: [
+    <span class="s">"canonical_issue_closed"</span>,
+    <span class="s">"existing_competition"</span>
+  ],
+  <span class="k">"evidence"</span>: {
+    <span class="k">"competing_pull_requests"</span>: <span class="n">12</span>
+  }
+}</pre>
+        </div>
+      </section>
+      <section class="grid" id="evidence">
+        <article class="feature"><h2>Canonical state</h2><p>Reject closed, assigned, stale, or crowded issues using current first-party GitHub evidence.</p></article>
+        <article class="feature"><h2>Payout reality</h2><p>Separate explicit payment evidence from labels, wishful comments, mirrors, and unsupported headlines.</p></article>
+        <article class="feature"><h2>Agent-ready output</h2><p>Receive a verdict, score, reasons, and evidence as deterministic JSON for automated go/no-go decisions.</p></article>
+      </section>
+      <section class="how" id="use">
+        <div>
+          <span class="eyebrow">Installable workflow</span>
+          <h2>Add the check to your coding agent.</h2>
+          <p>The buyer workflow validates the canonical issue URL and exact Base-USDC challenge before signing. Your existing wallet and spend policy remain in control.</p>
+          <div class="proof"><span class="pill">x402 v2</span><span class="pill">OpenAPI 3.1</span><span class="pill">A2A 0.3</span><span class="pill">MIT source</span></div>
+        </div>
+        <div class="snippet"><code>npx skills add ArgonautWorks/bounty-signal-api --skill bounty-signal
+
+GET ${CANONICAL_ORIGIN}/api/v1/check
+  ?url=https://github.com/{owner}/{repo}/issues/{number}</code></div>
+      </section>
+    </main>
+    <footer><div class="foot"><span>ArgonautWorks Bounty Signal</span><span><a href="/openapi.json">OpenAPI</a> · <a href="/.well-known/x402">x402 manifest</a> · <a href="/.well-known/agent-card.json">Agent Card</a> · <a href="${PUBLIC_SOURCE}">GitHub</a></span></div></footer>
+  </div>
+</body>
+</html>`;
+}
 
 if (!/^0x[a-fA-F0-9]{40}$/.test(PAY_TO)) {
   throw new Error("PAY_TO must be an EVM address");
@@ -176,8 +287,16 @@ app.use(paymentMiddleware({
   "POST /api/v1/report": paidReportPostResource,
 }, resourceServer));
 
-app.get("/", (_request, response) => {
-  response.json({
+app.get("/", (request, response) => {
+  if (/\btext\/html\b/i.test(request.get("accept") ?? "")) {
+    response
+      .set("vary", "accept")
+      .set("cache-control", "public, max-age=300")
+      .type("text/html")
+      .send(renderLandingPage());
+    return;
+  }
+  response.set("vary", "accept").json({
     service: "ArgonautWorks Bounty Signal API",
     purpose: "Reject stale, fake, crowded, or unfunded GitHub bounties before an agent spends implementation time.",
     endpoint: "GET with a url query parameter or POST {\"url\":\"https://github.com/{owner}/{repo}/issues/{number}\"} to /api/v1/check",
@@ -193,8 +312,36 @@ app.get("/", (_request, response) => {
     agent_card: "/.well-known/agent-card.json",
     a2a: "/a2a",
     x402_manifest: "/.well-known/x402",
+    sample: "/api/v1/sample",
     source: PUBLIC_SOURCE,
   });
+});
+
+app.get("/api/v1/sample", (_request, response) => {
+  response.set("cache-control", "public, max-age=86400").json(SAMPLE_CHECK);
+});
+
+app.get("/robots.txt", (_request, response) => {
+  response.type("text/plain").send([
+    "User-agent: *",
+    "Allow: /",
+    `Sitemap: ${CANONICAL_ORIGIN}/sitemap.xml`,
+    "",
+  ].join("\n"));
+});
+
+app.get("/sitemap.xml", (_request, response) => {
+  const urls = ["/", "/api/v1/sample", "/openapi.json", "/llms.txt", "/.well-known/agent-card.json"];
+  response.type("application/xml").send([
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ...urls.map((url) => `  <url><loc>${CANONICAL_ORIGIN}${url}</loc></url>`),
+    "</urlset>",
+  ].join("\n"));
+});
+
+app.get(`/${INDEXNOW_KEY}.txt`, (_request, response) => {
+  response.type("text/plain").send(INDEXNOW_KEY);
 });
 
 app.get(["/.well-known/agent.json", "/.well-known/agent-card.json"], (request, response) => {
@@ -315,6 +462,18 @@ app.get("/openapi.json", (request, response) => {
     },
     servers: [{ url: origin }],
     paths: {
+      "/api/v1/sample": {
+        get: {
+          operationId: "getBountyCheckSample",
+          summary: "View a static example of the paid response schema",
+          responses: {
+            200: {
+              description: "Static, explicitly non-live example verdict",
+              content: { "application/json": { schema: { type: "object" } } },
+            },
+          },
+        },
+      },
       "/api/v1/check": {
         get: {
           operationId: "checkGitHubBounty",
@@ -509,6 +668,7 @@ app.get("/llms.txt", (_request, response) => {
     SERVICE_DESCRIPTION,
     "",
     "Paid endpoint: GET /api/v1/check?url=https://github.com/{owner}/{repo}/issues/{number}",
+    "Free static response sample: GET /api/v1/sample (illustrative, not a live check)",
     "Marketplace-compatible endpoint: POST /api/v1/check with JSON {\"url\":\"https://github.com/{owner}/{repo}/issues/{number}\"}",
     `Price: ${PRICE} USDC on Base via x402 v2`,
     `Paid report: GET /api/v1/report?edition=${REPORT_EDITION} or POST /api/v1/report with JSON {\"edition\":\"${REPORT_EDITION}\"}`,

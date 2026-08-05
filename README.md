@@ -24,6 +24,8 @@ The A2A agent card at `/.well-known/agent-card.json` advertises Bounty Signal, S
 
 Production: <https://argonaut-bounty-signal.vercel.app>
 
+Browsers receive an indexed HTML landing page with an explicitly static sample verdict, while JSON and agent clients retain the machine-readable root response through content negotiation. `/robots.txt`, `/sitemap.xml`, and the root-hosted IndexNow key support accountless search discovery without changing or weakening the paid route. `/api/v1/sample` demonstrates the response contract but never presents itself as a current issue check.
+
 The POST form is listed on PayanAgent at <https://payanagent.com/x402/kh71sbt41467k8dfjp3t204chx8bvf71>. PayanAgent relays the service's original x402 challenge, so the buyer makes one direct payment to the ArgonautWorks receiving wallet rather than paying two gates.
 
 Install the buyer workflow in supported coding agents:
