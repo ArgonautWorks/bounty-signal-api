@@ -4,6 +4,7 @@ import {
   AGENTPACT_ACCEPT_MILESTONE_SELECTOR,
   AGENTPACT_ESCROW,
   AGENTPACT_REPORT_PAYOUT_ATOMIC,
+  ATELIER_IMAGE_PAYOUT_ATOMIC,
   ATELIER_REPORT_PAYOUT_ATOMIC,
   ATELIER_TREASURY,
   ATELIER_X402_REPORT_PAYOUT_ATOMIC,
@@ -124,6 +125,34 @@ test("classifies only the exact Atelier treasury payout for the marketplace repo
     WALLET,
   );
   assert.equal(x402Receipt.revenue_usd, 0.5);
+});
+
+test("classifies only the exact Atelier treasury payout for a product image", () => {
+  const receipt = classifyBountySignalTransfer(
+    paidLog({
+      topics: [TRANSFER_TOPIC, addressTopic(ATELIER_TREASURY), addressTopic(WALLET)],
+      data: `0x${ATELIER_IMAGE_PAYOUT_ATOMIC.toString(16)}`,
+      transactionHash: "0xatelierimage",
+    }),
+    { to: BASE_USDC, input: `${TRANSFER_SELECTOR}00` },
+    WALLET,
+  );
+  assert.deepEqual(receipt, {
+    experiment_id: "E059",
+    kind: "marketplace_revenue",
+    revenue_usd: 0.09,
+    product: "atelier_product_image",
+    transaction: "0xatelierimage",
+    payer: ATELIER_TREASURY,
+    amount_usdc_atomic: "90000",
+    block_number: 49528401,
+  });
+  assert.match(revenueLedgerRow(receipt), /Settled Atelier product concept image payout/);
+  assert.equal(classifyBountySignalTransfer(
+    paidLog({ data: `0x${ATELIER_IMAGE_PAYOUT_ATOMIC.toString(16)}` }),
+    { to: BASE_USDC, input: `${TRANSFER_SELECTOR}00` },
+    WALLET,
+  ), null);
 });
 
 test("classifies only an AgentPact escrow release for the exact report payout", () => {
